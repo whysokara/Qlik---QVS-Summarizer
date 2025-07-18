@@ -1,0 +1,77 @@
+// SECTION ACCESS for Row-Level Security
+SECTION ACCESS;
+LOAD * INLINE [
+    ACCESS, USERID, REGION
+    ADMIN, DOMAIN\ADMIN, *
+    USER, DOMAIN\JSMITH, North
+    USER, DOMAIN\ADOE, South
+];
+SECTION APPLICATION;
+
+// REGION Mapping
+RegionMap:
+MAPPING LOAD * INLINE [
+    RegionCode, RegionName
+    N, North
+    S, South
+    E, East
+    W, West
+];
+
+// EMPLOYEE Hierarchy (Manager-Employee)
+Employees:
+LOAD 
+    EmpID,
+    EmpName,
+    ManagerID,
+    ApplyMap('RegionMap', RegionCode, 'Unknown') as Region,
+    Department
+FROM [lib://Data/Employees.qvd] (qvd);
+
+Hierarchy(EmpID, ManagerID, EmpName, ParentName, EmpPath, '/', Depth)
+LOAD 
+    EmpID,
+    ManagerID,
+    EmpName
+RESIDENT Employees;
+
+// SALES Table
+Sales:
+LOAD 
+    SaleID,
+    EmpID,
+    SaleAmount,
+    SaleDate
+FROM [lib://Data/Sales.qvd] (qvd);
+
+// ACTIVITY INTERVALS
+ActivityWindows:
+LOAD 
+    StartTime,
+    EndTime,
+    ActivityType
+FROM [lib://Data/ActivityWindows.qvd] (qvd);
+
+// INTERVAL MATCH: Match SaleDate to Activity Windows
+IntervalMatchTable:
+INTERVALMATCH(SaleDate)
+LOAD 
+    StartTime,
+    EndTime
+RESIDENT ActivityWindows;
+
+// JOIN matched ActivityType
+LEFT JOIN (Sales)
+LOAD 
+    SaleDate,
+    ActivityType
+RESIDENT IntervalMatchTable
+JOIN (Sales)
+LOAD 
+    StartTime,
+    EndTime,
+    ActivityType
+RESIDENT ActivityWindows;
+
+// CLEANUP
+DROP TABLE IntervalMatchTable;

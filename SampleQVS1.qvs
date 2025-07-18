@@ -1,0 +1,68 @@
+// Load Customers table
+Customers:
+LOAD
+    CustomerID,
+    FirstName,
+    LastName,
+    Country,
+    Date(DateJoined, 'YYYY-MM-DD') AS JoinDate
+FROM [lib://Data/Customers.csv]
+(txt, codepage is 1252, embedded labels, delimiter is ',', msq);
+
+// Load Products table
+Products:
+LOAD
+    ProductID,
+    ProductName,
+    Category,
+    Price
+FROM [lib://Data/Products.csv]
+(txt, codepage is 1252, embedded labels, delimiter is ',', msq);
+
+// Load Orders table
+OrdersRaw:
+LOAD
+    OrderID,
+    CustomerID,
+    ProductID,
+    Date(OrderDate, 'YYYY-MM-DD') AS OrderDate,
+    Quantity
+FROM [lib://Data/Orders.csv]
+(txt, codepage is 1252, embedded labels, delimiter is ',', msq);
+
+// Enrich Orders with calculated values
+Orders:
+LOAD
+    OrderID,
+    CustomerID,
+    ProductID,
+    OrderDate,
+    Quantity,
+    Quantity * Price AS TotalAmount
+RESIDENT OrdersRaw
+LEFT JOIN (Products)
+LOAD
+    ProductID,
+    Price
+RESIDENT Products;
+
+// Drop the raw Orders table
+DROP TABLE OrdersRaw;
+
+// Create a summary table of Total Spend per Customer
+CustomerSpend:
+LOAD
+    CustomerID,
+    SUM(TotalAmount) AS TotalSpend
+RESIDENT Orders
+GROUP BY CustomerID;
+
+// Join CustomerSpend into Customers
+LEFT JOIN (Customers)
+LOAD
+    CustomerID,
+    TotalSpend
+RESIDENT CustomerSpend;
+
+// Cleanup
+DROP TABLE CustomerSpend;
