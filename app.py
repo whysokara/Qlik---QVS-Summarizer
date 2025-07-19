@@ -1,30 +1,29 @@
+# Import necessary libraries
 import os
 import google.generativeai as genai
 from IPython.display import Markdown, display
 from dotenv import load_dotenv
-
 import markdown
 from weasyprint import HTML
 
+# Load environment variables from .env file
 load_dotenv()
 
-
+# Retrieve the Gemini API key from environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-with open("qlik1.qvs", "r") as file:
+# Read QlikSense script file (.qvs) as raw text content
+with open("sample/SampleQVS1.qvs", "r") as file:
     content = file.read()
 
-display(Markdown(content))
-
-
-# 1. SETUP YOUR API KEY
+# Configure the Gemini API with the provided API key
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 2. LOAD YOUR QVS FILE CONTENT
-with open("qlik1.qvs", "r") as file:
+# Read the QlikSense script again (can reuse `content` if optimization needed)
+with open("sample/SampleQVS1.qvs", "r") as file:
     qvs_code = file.read()
 
-# 3. BASE PROMPT TO EXPLAIN QLIK SCRIPT
+# Define a detailed prompt instructing the model on how to analyze and explain the QlikSense script
 instruction = """
 You are a senior Qlik Sense developer and documentation expert with over 10 years of experience working in complex enterprise environments. Your task is to **analyze the provided Qlik Sense script** (typically written in `.qvs` files or inline within a dashboard) and generate a clear, modular, natural language explanation of the code.
 
@@ -98,20 +97,20 @@ At the end of the explanation, generate a **brief summary of the overall logic**
 
 """
 
-# 4. INITIALIZE GEMINI MODEL
+# Initialize the Gemini model with a lightweight, cost-effective model
 model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite")
 
-# 5. SEND REQUEST
+# Generate explanation by providing instruction and Qlik script to Gemini model
 response = model.generate_content([instruction, qvs_code])
 
-# 6. PRINT OUTPUT
+# Print a readable header to console for debugging or verification
 print("\n========== QlikSense Script Explanation ==========\n")
-# print(response.text)
-# print(response.text)
-# Convert Markdown to HTML
+
+# Convert markdown response from Gemini to HTML for PDF generation
 html_content = markdown.markdown(response.text)
 
-# Save as PDF
+# Generate a PDF report titled "Dashboard Summary.pdf" from the HTML content
 HTML(string=html_content).write_pdf("Dashboard Summary.pdf")
-print("done")
 
+# Print completion status
+print("done")
