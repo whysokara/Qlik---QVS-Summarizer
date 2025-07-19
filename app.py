@@ -1,30 +1,30 @@
-# Import necessary libraries
 import os
+import streamlit as st
 import google.generativeai as genai
-from IPython.display import Markdown, display
 from dotenv import load_dotenv
 import markdown
 from weasyprint import HTML
+import tempfile
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
-
-# Retrieve the Gemini API key from environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Read QlikSense script file (.qvs) as raw text content
-with open("sample/SampleQVS1.qvs", "r") as file:
-    content = file.read()
-
-# Configure the Gemini API with the provided API key
+# Configure Gemini
 genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite")
 
-# Read the QlikSense script again (can reuse `content` if optimization needed)
-with open("sample/SampleQVS1.qvs", "r") as file:
-    qvs_code = file.read()
+# Streamlit UI
+st.set_page_config(page_title="QlikSense Script Analyzer", layout="wide")
+st.title("🔍 QlikSense Script Analyzer using Gemini")
 
-# Define a detailed prompt instructing the model on how to analyze and explain the QlikSense script
-instruction = """
+uploaded_file = st.file_uploader("📤 Upload a QlikSense `.qvs` file", type=["qvs"])
+
+if uploaded_file:
+    qvs_code = uploaded_file.read().decode("utf-8")
+
+    # Detailed prompt
+    instruction = """
 You are a senior Qlik Sense developer and documentation expert with over 10 years of experience working in complex enterprise environments. Your task is to **analyze the provided Qlik Sense script** (typically written in `.qvs` files or inline within a dashboard) and generate a clear, modular, natural language explanation of the code.
 
 You are assisting a new developer or business analyst who wants to understand what this Qlik dashboard is doing.
@@ -95,22 +95,20 @@ At the end of the explanation, generate a **brief summary of the overall logic**
 - Don’t rewrite the code unless explicitly asked.
 - Don’t oversimplify — the explanation should be developer-ready.
 
-"""
+"""  # truncated here for brevity — use your full instruction as in the original
 
-# Initialize the Gemini model with a lightweight, cost-effective model
-model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite")
+    with st.spinner("Analyzing your QVS file with Gemini..."):
+        response = model.generate_content([instruction, qvs_code])
+        explanation = response.text
+        html_content = markdown.markdown(explanation)
 
-# Generate explanation by providing instruction and Qlik script to Gemini model
-response = model.generate_content([instruction, qvs_code])
+        # Generate PDF in a temp file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+            HTML(string=html_content).write_pdf(tmp_pdf.name)
+            pdf_path = tmp_pdf.name
 
-# Print a readable header to console for debugging or verification
-print("\n========== QlikSense Script Explanation ==========\n")
-
-# Convert markdown response from Gemini to HTML for PDF generation
-html_content = markdown.markdown(response.text)
-
-# Generate a PDF report titled "Dashboard Summary.pdf" from the HTML content
-HTML(string=html_content).write_pdf("Dashboard Summary.pdf")
-
-# Print completion status
-print("done")
+        st.success("✅ Analysis complete! Download your report below.")
+        st.download_button("📄 Download PDF Report", data=open(pdf_path, "rb"), file_name="Dashboard_Summary.pdf", mime="application/pdf")
+        st.markdown("---")
+        st.subheader("🧾 Gemini Explanation (Preview)")
+        st.markdown(explanation, unsafe_allow_html=True)
