@@ -14,16 +14,49 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite")
 
-# Streamlit UI
-st.set_page_config(page_title="QlikSense Script Analyzer", layout="wide")
-st.title("🔍 QlikSense Script Analyzer using Gemini")
+# Set Streamlit page config
+st.set_page_config(
+    page_title="ScriptSense – Qlik Analyzer",
+    page_icon="🧠",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-uploaded_file = st.file_uploader("📤 Upload a QlikSense `.qvs` file", type=["qvs"])
+# Light-themed minimalist styling
+st.markdown("""
+    <style>
+        html, body {
+            background-color: #f9f9f9;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        .stApp {
+            background-color: #ffffff;
+        }
+        .css-1v0mbdj, .stTextInput, .stFileUploader {
+            border-radius: 12px !important;
+        }
+        h1, h2, h3 {
+            color: #202124;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Brand + Hero Section
+st.title("🧠 ScriptSense")
+st.subheader("AI-powered QlikSense Script Analyzer")
+st.caption("Upload a `.qvs` script. Let Gemini explain everything clearly — like a senior developer would.")
+
+# Upload
+uploaded_file = st.file_uploader("📤 Drop your QlikSense `.qvs` file here", type=["qvs"])
 
 if uploaded_file:
     qvs_code = uploaded_file.read().decode("utf-8")
 
-    # Detailed prompt
+    # Prompt for Gemini
     instruction = """
 You are a senior Qlik Sense developer and documentation expert with over 10 years of experience working in complex enterprise environments. Your task is to **analyze the provided Qlik Sense script** (typically written in `.qvs` files or inline within a dashboard) and generate a clear, modular, natural language explanation of the code.
 
@@ -95,20 +128,39 @@ At the end of the explanation, generate a **brief summary of the overall logic**
 - Don’t rewrite the code unless explicitly asked.
 - Don’t oversimplify — the explanation should be developer-ready.
 
-"""  # truncated here for brevity — use your full instruction as in the original
+"""  # Full prompt as you had before
 
     with st.spinner("Analyzing your QVS file with Gemini..."):
         response = model.generate_content([instruction, qvs_code])
         explanation = response.text
         html_content = markdown.markdown(explanation)
 
-        # Generate PDF in a temp file
+       
+       # Extract base filename and create corresponding PDF filename
+        base_filename = os.path.splitext(uploaded_file.name)[0]
+        pdf_filename = f"{base_filename}.pdf"
+
+        # Generate the PDF into a temp file with user-defined name
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
             HTML(string=html_content).write_pdf(tmp_pdf.name)
             pdf_path = tmp_pdf.name
 
-        st.success("✅ Analysis complete! Download your report below.")
-        st.download_button("📄 Download PDF Report", data=open(pdf_path, "rb"), file_name="Dashboard_Summary.pdf", mime="application/pdf")
-        st.markdown("---")
-        st.subheader("🧾 Gemini Explanation (Preview)")
+
+        # Output
+        st.success("✅ Analysis complete!")
+        st.download_button(
+            label="📄 Download Full PDF Report",
+            data=open(pdf_path, "rb"),
+            file_name=pdf_filename,
+            mime="application/pdf"
+        )
+
+        st.markdown("### 🧾 Gemini Explanation (Preview)", help="Here's what Gemini inferred from your QlikSense script:")
         st.markdown(explanation, unsafe_allow_html=True)
+
+else:
+    st.info("Awaiting your `.qvs` script upload to begin analysis.")
+
+# Footer
+st.markdown("---")
+st.caption("✨ Built with love by [kara](https://x.com/whysokara).. making your Qlik workflows smarter.")
